@@ -5,7 +5,6 @@ import { DockerImageFunction }  from 'aws-cdk-lib/aws-lambda';
 import { DockerImageCode,Architecture } from 'aws-cdk-lib/aws-lambda';
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as iam from "aws-cdk-lib/aws-iam";
-import { AttributeType, Table, } from "aws-cdk-lib/aws-dynamodb";
 import * as ecr from 'aws-cdk-lib/aws-ecr';
 import { VpcStack } from './vpc-stack.js';
 import {GlueStack} from './glue-stack.js';
