@@ -1,7 +1,7 @@
 #!/bin/bash
 
 OPENSEARCH_ENDPOINT="$1"
-DIMENSION="$2"
+DIMENSION="${2:-1024}"
 
 payload1="{
     \"settings\" : {
