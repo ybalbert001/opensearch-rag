@@ -47,7 +47,9 @@ export class GlueStack extends NestedStack {
               '--AOS_ENDPOINT':props.opensearch_endpoint,
               '--REGION':props.region,
               '--AOS_INDEX': "rag-data-index",
-              '--additional-python-modules': 'pdfminer.six==20221105,gremlinpython==3.6.3,langchain==0.0.162,beautifulsoup4==4.12.2,boto3>=1.28.52,botocore>=1.31.52,,anthropic_bedrock,python-docx'
+              '--additional-python-modules': 'boto3>=1.28.52,botocore>=1.31.52',
+              '--bucket': '687752207838-24-04-10-02-26-15-aos-rag-bucket',
+              '--object_key': 'kb/crosslingual_teminology.json,kb/multilingual_terminology.json'
           }
       })
       ingest_job.role.addToPrincipalPolicy(
@@ -81,7 +83,7 @@ export class GlueStack extends NestedStack {
               '--AOS_ENDPOINT':props.opensearch_endpoint,
               '--REGION':props.region,
               '--AOS_INDEX': "rag-data-index",
-              '--additional-python-modules': 'pdfminer.six==20221105,gremlinpython==3.6.3,langchain==0.0.162,beautifulsoup4==4.12.2,boto3>=1.28.52,botocore>=1.31.52,,anthropic_bedrock,python-docx'
+              '--additional-python-modules': 'boto3>=1.28.52,botocore>=1.31.52',
           }
       })
       rag_job.role.addToPrincipalPolicy(
