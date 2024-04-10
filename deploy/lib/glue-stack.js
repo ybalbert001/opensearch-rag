@@ -46,7 +46,7 @@ export class GlueStack extends NestedStack {
           defaultArguments:{
               '--AOS_ENDPOINT':props.opensearch_endpoint,
               '--REGION':props.region,
-              '--AOS_INDEX': "rag-data-src",
+              '--AOS_INDEX': "rag-data-index",
               '--additional-python-modules': 'pdfminer.six==20221105,gremlinpython==3.6.3,langchain==0.0.162,beautifulsoup4==4.12.2,boto3>=1.28.52,botocore>=1.31.52,,anthropic_bedrock,python-docx'
           }
       })
@@ -66,7 +66,7 @@ export class GlueStack extends NestedStack {
               })
       )
 
-      const rag_job = new glue.Job(this, 'ingest-knowledge-from-s3',{
+      const rag_job = new glue.Job(this, 'rag-process',{
             executable: glue.JobExecutable.pythonShell({
             glueVersion: glue.GlueVersion.V1_0,
             pythonVersion: glue.PythonVersion.THREE_NINE,
@@ -80,7 +80,7 @@ export class GlueStack extends NestedStack {
           defaultArguments:{
               '--AOS_ENDPOINT':props.opensearch_endpoint,
               '--REGION':props.region,
-              '--AOS_INDEX': "rag-data-src",
+              '--AOS_INDEX': "rag-data-index",
               '--additional-python-modules': 'pdfminer.six==20221105,gremlinpython==3.6.3,langchain==0.0.162,beautifulsoup4==4.12.2,boto3>=1.28.52,botocore>=1.31.52,,anthropic_bedrock,python-docx'
           }
       })
