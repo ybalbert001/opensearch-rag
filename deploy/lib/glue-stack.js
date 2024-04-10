@@ -13,7 +13,7 @@ export class GlueStack extends NestedStack {
 
     jobArn = '';
     jobName = '';
-    rag_jobName = '';
+    ragJobName = '';
     /**
      *
      * @param {Construct} scope
@@ -72,7 +72,7 @@ export class GlueStack extends NestedStack {
             pythonVersion: glue.PythonVersion.THREE_NINE,
             script: glue.Code.fromAsset(path.join(__dirname, '../../code/offline_process/aos_rag_process.py')),
           }),
-          jobName:'ingest_knowledge',
+          jobName:'excute-rag-pipeline',
           maxConcurrentRuns:100,
           maxRetries:0,
           connections:[connection],
@@ -101,6 +101,6 @@ export class GlueStack extends NestedStack {
       )
       this.jobArn = ingest_job.jobArn;
       this.jobName = ingest_job.jobName;
-      this.rag_jobName = job.rag_jobName
+      this.ragJobName = rag_job.jobName
     }
 }
