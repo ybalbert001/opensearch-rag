@@ -47,7 +47,9 @@ export class GlueStack extends NestedStack {
               '--AOS_ENDPOINT':props.opensearch_endpoint,
               '--REGION':props.region,
               '--AOS_INDEX': "rag-data-index",
-              '--additional-python-modules': 'pdfminer.six==20221105,gremlinpython==3.6.3,langchain==0.0.162,beautifulsoup4==4.12.2,boto3>=1.28.52,botocore>=1.31.52,,anthropic_bedrock,python-docx'
+              '--additional-python-modules': 'boto3>=1.28.52,botocore>=1.31.52',
+              '--bucket': '687752207838-24-04-10-02-26-15-aos-rag-bucket',
+              '--object_key': 'kb/crosslingual_terminology.json,kb/multilingual_terminology.json'
           }
       })
       ingest_job.role.addToPrincipalPolicy(
@@ -70,9 +72,9 @@ export class GlueStack extends NestedStack {
             executable: glue.JobExecutable.pythonShell({
             glueVersion: glue.GlueVersion.V1_0,
             pythonVersion: glue.PythonVersion.THREE_NINE,
-            script: glue.Code.fromAsset(path.join(__dirname, '../../code/offline_process/aos_rag_process.py')),
+            script: glue.Code.fromAsset(path.join(__dirname, '../../code/offline_process/rag_based_translate.py')),
           }),
-          jobName:'excute-rag-pipeline',
+          jobName:'rag_based_translate',
           maxConcurrentRuns:100,
           maxRetries:0,
           connections:[connection],
@@ -81,7 +83,10 @@ export class GlueStack extends NestedStack {
               '--AOS_ENDPOINT':props.opensearch_endpoint,
               '--REGION':props.region,
               '--AOS_INDEX': "rag-data-index",
-              '--additional-python-modules': 'pdfminer.six==20221105,gremlinpython==3.6.3,langchain==0.0.162,beautifulsoup4==4.12.2,boto3>=1.28.52,botocore>=1.31.52,,anthropic_bedrock,python-docx'
+              '--additional-python-modules': 'boto3>=1.28.52,botocore>=1.31.52',
+              '--model_id': 'anthropic.claude-3-sonnet-20240229-v1:0',
+              '--object_key': 'src_files/chat_text.json',
+              '--bucket': '687752207838-24-04-10-02-26-15-aos-rag-bucket',
           }
       })
       rag_job.role.addToPrincipalPolicy(

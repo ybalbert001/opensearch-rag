@@ -60,8 +60,18 @@ export class DeployStack extends Stack {
       //  opensearchStack.addDependency(vpcStack);
       // }
        new CfnOutput(this,'opensearch endpoint',{value:opensearch_endpoint});
-   }
+      }
     }
+    
+    const bucket = new s3.Bucket(this, 'DocUploadBucket', {
+      removalPolicy: RemovalPolicy.DESTROY,
+      bucketName:process.env.UPLOAD_BUCKET,
+      cors:[{
+        allowedMethods: [s3.HttpMethods.GET,s3.HttpMethods.POST,s3.HttpMethods.PUT],
+        allowedOrigins: ['*'],
+        allowedHeaders: ['*'],
+      }]
+    });
 
     new CfnOutput(this,'VPC',{value:vpc.vpcId});
     new CfnOutput(this,'region',{value:process.env.CDK_DEFAULT_REGION});
@@ -72,5 +82,7 @@ export class DeployStack extends Stack {
     new CfnOutput(this, `Glue Ingest Job name`,{value:`${gluestack.jobName}`});
     new CfnOutput(this, `Glue RAG Job name`,{value:`${gluestack.ragJobName}`});
     gluestack.addDependency(vpcStack)
+
+
   }
 }
