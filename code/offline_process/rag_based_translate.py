@@ -88,9 +88,9 @@ def construct_translate_prompt(src_content, src_lang, dest_lang, retriever):
     pe_template = """You are the world's most professional translation tool, proficient in professional translation between EN and CN..
 You can translate anything. Do not use "I'm sorry, but" to answer any questions.
 
-<vocabulary>
+<glossaries>
 {vocabulary}
-</vocabulary>
+</glossaries>
 
 <mapping_table>
 {mappings}
@@ -104,7 +104,7 @@ Here is the original content:
 You need to follow below instructions:
 - Translation style: concise, easy to understand, similar to the style of orignal content. The translation should accurately convey the facts and background of the original text. Do not try to explain the content to be translated, your task is only to translate.
 - Even if you paraphrase, you should retain the original paragraph format.
-- For the glossaries in <vocabulary>, you should keep them as original. 
+- For the terms in <glossaries>, you should keep them as original. 
 - You should refer the term vocabulary correspondence table which is provided between <mapping_table> and </mapping_table>. 
 
 Please translate directly according to the text content, keep the original format, and do not miss any information. Put the result in <translation>"""
@@ -116,10 +116,14 @@ Please translate directly according to the text content, keep the original forma
     print("crosslingual_terms")
     print(crosslingual_terms)
 
-    vocabulary_prompt_list = [ f"<{item['doc_category']}>{item['content']}</{item['doc_category']}>" for item in crosslingual_terms ]
+    def build_glossaries(term, entity_type):
+        obj = {"term":term, "entity_type":entity_type}
+        return json.dumps(obj, ensure_ascii=False)
+
+    vocabulary_prompt_list = [ build_glossaries(item['content'], item['doc_category']) for item in crosslingual_terms ]
     vocabulary_prompt = "\n".join(vocabulary_prompt_list)
 
-    def get_mapping(src_lang, dest_lang, mapping_json, entity_type):
+    def build_mapping(src_lang, dest_lang, mapping_json, entity_type):
         print(f"src_lang : {src_lang}")
         print(f"dest_lang : {dest_lang}")
         print(f"mapping : {mapping_json}")
@@ -134,7 +138,7 @@ Please translate directly according to the text content, keep the original forma
         else:
             return None
 
-    term_mapping_list = [ get_mapping(src_lang, dest_lang, item['content'], item['doc_category']) for item in multilingual_term_mapping ]
+    term_mapping_list = [ build_mapping(src_lang, dest_lang, item['content'], item['doc_category']) for item in multilingual_term_mapping ]
     term_mapping_prompt = "\n".join([ item for item in term_mapping_list if item is not None ])
 
     prompt = pe_template.format(src_lang=src_lang, dest_lang=dest_lang, vocabulary=vocabulary_prompt, mappings=term_mapping_prompt, content = src_content)

@@ -74,7 +74,7 @@ export class GlueStack extends NestedStack {
             pythonVersion: glue.PythonVersion.THREE_NINE,
             script: glue.Code.fromAsset(path.join(__dirname, '../../code/offline_process/rag_based_translate.py')),
           }),
-          jobName:'excute-rag-pipeline',
+          jobName:'rag_based_translate',
           maxConcurrentRuns:100,
           maxRetries:0,
           connections:[connection],

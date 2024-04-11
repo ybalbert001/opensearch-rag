@@ -58,14 +58,14 @@ def iterate_items(file_content, object_key):
         print(f"doc_type:{doc_type}, author:{author}")
 
         for idx, item in enumerate(arr):
-            content = ", ".join(item["terms"])
             doc_category = item["entity_type"]
 
-            try:
-                document = { "publish_date": publish_date, "doc" : '', "idx": idx, "doc_type" : doc_type, "content" : content, "doc_title": file_name, "doc_author": author, "doc_category": doc_category}
-                yield {"_index": AOS_INDEX, "_source": document, "_id": hashlib.md5(str(document).encode('utf-8')).hexdigest()}
-            except Exception as e:
-                print(f"failed to process, {str(e)}")
+            for term in item["terms"]:
+                try:
+                    document = { "publish_date": publish_date, "doc" : '', "idx": idx, "doc_type" : doc_type, "content" : term, "doc_title": file_name, "doc_author": author, "doc_category": doc_category}
+                    yield {"_index": AOS_INDEX, "_source": document, "_id": hashlib.md5(str(document).encode('utf-8')).hexdigest()}
+                except Exception as e:
+                    print(f"failed to process, {str(e)}")
 
 def load_content_json_from_s3(bucket, object_key):
     if object_key.endswith('.json'):
