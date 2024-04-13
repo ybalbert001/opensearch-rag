@@ -110,11 +110,7 @@ You need to follow below instructions:
 Please translate directly according to the text content, keep the original format, and do not miss any information. Put the result in <translation>"""
 
     multilingual_term_mapping = retriever.search_aos_for_terminology(src_content, doc_type='multilingual_terminology')
-    print("multilingual_term_mapping")
-    print(multilingual_term_mapping)
     crosslingual_terms = retriever.search_aos_for_terminology(src_content, doc_type='crosslingual_terminology')
-    print("crosslingual_terms")
-    print(crosslingual_terms)
 
     def build_glossaries(term, entity_type):
         obj = {"term":term, "entity_type":entity_type}
@@ -124,10 +120,6 @@ Please translate directly according to the text content, keep the original forma
     vocabulary_prompt = "\n".join(vocabulary_prompt_list)
 
     def build_mapping(src_lang, dest_lang, mapping_json, entity_type):
-        print(f"src_lang : {src_lang}")
-        print(f"dest_lang : {dest_lang}")
-        print(f"mapping : {mapping_json}")
-        print(f"entity_type : {entity_type}")
 
         obj = json.loads(mapping_json)
         src_term = obj.get(src_lang, None)
@@ -138,7 +130,7 @@ Please translate directly according to the text content, keep the original forma
         else:
             return None
 
-    term_mapping_list = [ build_mapping(src_lang, dest_lang, item['content'], item['doc_category']) for item in multilingual_term_mapping ]
+    term_mapping_list = list(set([ build_mapping(src_lang, dest_lang, item['content'], item['doc_category']) for item in multilingual_term_mapping ]))
     term_mapping_prompt = "\n".join([ item for item in term_mapping_list if item is not None ])
 
     prompt = pe_template.format(src_lang=src_lang, dest_lang=dest_lang, vocabulary=vocabulary_prompt, mappings=term_mapping_prompt, content = src_content)
