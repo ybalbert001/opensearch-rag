@@ -56,6 +56,6 @@ def lambda_handler(event, context):
     if not text:
         return {'error': 'Text is required'}
     
-    result = pseg.cut(text)
-    words = list(set([ item.word for item in result if item.flag == 'term' ]))
+    result = pseg.cut(text.replace(' ', '_'))
+    words = list(set([ item.word.replace('_', ' ') for item in result if item.flag == 'term' ]))
     return {'words': words}

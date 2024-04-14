@@ -34,55 +34,95 @@ bedrock = boto3.client(service_name='bedrock-runtime', region_name=REGION)
 credentials = boto3.Session().get_credentials()
 awsauth = AWSV4SignerAuth(credentials, REGION)
 
-class TerminologyRetriever():
-    aos_endpoint: str
-    aos_index: str
-    aos_client: object
+# class TerminologyRetriever():
+#     aos_endpoint: str
+#     aos_index: str
+#     aos_client: object
     
-    def __init__(self, aos_endpoint: str, aos_index: str, aos_client: object):
-        self.aos_endpoint = aos_endpoint
-        self.aos_index = aos_index
-        self.aos_client = aos_client
+#     def __init__(self, aos_endpoint: str, aos_index: str, aos_client: object):
+#         self.aos_endpoint = aos_endpoint
+#         self.aos_index = aos_index
+#         self.aos_client = aos_client
         
-    @classmethod
-    def from_endpoints(cls, aos_endpoint:str, aos_index:str):
-        aos_client = OpenSearch(
-                hosts=[{'host': aos_endpoint, 'port': 443}],
-                http_auth = awsauth,
-                use_ssl=True,
-                verify_certs=True,
-                connection_class=RequestsHttpConnection
-            )
+#     @classmethod
+#     def from_endpoints(cls, aos_endpoint:str, aos_index:str):
+#         aos_client = OpenSearch(
+#                 hosts=[{'host': aos_endpoint, 'port': 443}],
+#                 http_auth = awsauth,
+#                 use_ssl=True,
+#                 verify_certs=True,
+#                 connection_class=RequestsHttpConnection
+#             )
 
-        return cls(aos_endpoint=aos_endpoint,
-                  aos_index=aos_index,
-                  aos_client=aos_client)
+#         return cls(aos_endpoint=aos_endpoint,
+#                   aos_index=aos_index,
+#                   aos_client=aos_client)
 
-    def search_aos_for_terminology(self, src_content, doc_type, size=10):
-        query = {
-            "size": size,
-            "query": {
-                "bool": {
-                    "must": {
-                        "match": {
-                            "content": src_content
-                        }
-                    },
-                "filter": {
-                    "term": {
-                        "doc_type": doc_type
-                        }
-                    }
-                }
-            }
-        }
-        query_response = self.aos_client.search(
-            body=query,
-            index=self.aos_index
+#     def search_aos_for_terminology(self, src_content, doc_type, size=10):
+#         query = {
+#             "size": size,
+#             "query": {
+#                 "bool": {
+#                     "must": {
+#                         "match": {
+#                             "content": src_content
+#                         }
+#                     },
+#                 "filter": {
+#                     "term": {
+#                         "doc_type": doc_type
+#                         }
+#                     }
+#                 }
+#             }
+#         }
+#         query_response = self.aos_client.search(
+#             body=query,
+#             index=self.aos_index
+#         )
+
+#         result_arr = [ {'idx':item['_source'].get('idx',0),'doc_category':item['_source']['doc_category'], 'content':item['_source']['content'], 'doc_type': item['_source']['doc_type'], 'score': item['_score']} for item in query_response["hits"]["hits"]]
+#         return result_arr
+
+class TerminologyRetriever():
+    ddb_en_table : object
+    ddb_chs_table : object
+    segmentor_lambda_client : object
+    
+    def __init__(self, ddb_meta_en_table: str, ddb_meta_chs_table: str, region:str):
+        self.segmentor_lambda_client = boto3.client('lambda', region)
+        dynamodb = boto3.resource('dynamodb', region)
+        self.ddb_en_table = dynamodb.Table(ddb_meta_en_table)
+        self.ddb_chs_table = dynamodb.Table(ddb_meta_chs_table)
+
+    def retrieve_term_mapping(self, src_content, target_lang):
+        payload = { "text" : src_content }
+
+        segment_response = lambda_client.invoke(
+            FunctionName='jieba_segmentor',
+            InvocationType='RequestResponse',
+            Payload=json.dumps(payload)
         )
 
-        result_arr = [ {'idx':item['_source'].get('idx',0),'doc_category':item['_source']['doc_category'], 'content':item['_source']['content'], 'doc_type': item['_source']['doc_type'], 'score': item['_score']} for item in query_response["hits"]["hits"]]
-        return result_arr
+        payload_json = json.loads(segment_response.get('Payload').read())
+        term_list = payload_json.get('words')
+        print("term_list")
+        print(term_list)
+
+        mapping_list = []
+        for term in term_list:
+            print(f"find mapping of {term}")
+            response = self.ddb_table.get_item(Key={'term': term})
+            if "Item" in response.keys():
+                kv_result = json.loads(response["Item"]["content"])
+                print("kv_result['mapping']")
+                mapping = kv_result['mapping']
+                entity = kv_result['entity_type']
+                mapping_list.append((term, kv_result['mapping']['target_lang'], entity))
+
+        print(mapping_list)
+
+        return mapping_list
 
 def construct_translate_prompt(src_content, src_lang, dest_lang, retriever):
     pe_template = """You are the world's most professional translation tool, proficient in professional translation between EN and CN..
@@ -109,8 +149,8 @@ You need to follow below instructions:
 
 Please translate directly according to the text content, keep the original format, and do not miss any information. Put the result in <translation>"""
 
-    multilingual_term_mapping = retriever.search_aos_for_terminology(src_content, doc_type='multilingual_terminology')
-    crosslingual_terms = retriever.search_aos_for_terminology(src_content, doc_type='crosslingual_terminology')
+    multilingual_term_mapping = retriever.retrieve_term_mapping(src_content, dest_lang)
+    crosslingual_terms = []
 
     def build_glossaries(term, entity_type):
         obj = {"term":term, "entity_type":entity_type}

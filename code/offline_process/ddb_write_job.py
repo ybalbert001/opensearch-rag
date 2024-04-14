@@ -28,7 +28,8 @@ bedrock = boto3.client(service_name='bedrock-runtime',
                        region_name=REGION)
 
 dynamodb = boto3.resource('dynamodb', REGION)
-ddb_table = dynamodb.Table('rag_translate_table')
+ddb_en_table = dynamodb.Table('rag_translate_en_table')
+ddb_chs_table = dynamodb.Table('rag_translate_chs_table')
 
 publish_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -41,30 +42,44 @@ def ingest_all_items(file_content, object_key):
         doc_type = json_obj["type"]
         author = json_obj.get("author","")
 
-        for idx, item in enumerate(arr):
-            en_key = item["mapping"]['EN']
-            chs_key = item["mapping"]['CHS']
-            entity = item["entity_type"]
-            json_value = json.dumps(item["mapping"])
+        en_data = {}
+        for item in arr:
+            if 'EN' in item['mapping'].keys():
+                key = item['mapping']['EN']
+                en_data[key] = item
 
-            # 定义要写入的数据
-            en_item = {
-                'term': en_key,
-                'entity': entity,
-                'lang': 'EN',
-                'mapping': item["mapping"]
-            }
+        chs_data = {}
+        for item in arr:
+            if 'CHS' in item['mapping'].keys():
+                key = item['mapping']['CHS']
+                chs_data[key] = item
 
-            chs_item = {
-                'term': chs_key,
-                'entity': entity,
-                'lang': 'CHS',
-                'mapping': item["mapping"]
-            }
 
-            # 写入数据
-            ddb_table.put_item(Item=en_item)
-            ddb_table.put_item(Item=chs_item)
+        en_data_size = len(en_data.keys())
+        print(f"en_data_size: {en_data_size}")
+
+        chs_data_size = len(chs_data.keys())
+        print(f"chs_data_size: {chs_data_size}")
+
+        with ddb_en_table.batch_writer() as batch:
+            for en_key, en_value in en_data.items():
+                en_item = {
+                    'term': en_key,
+                    'entity': en_value['entity_type'],
+                    'mapping' : en_value['mapping'],
+                }
+                batch.put_item(Item=en_item)
+
+        with ddb_chs_table.batch_writer() as batch:
+            for chs_key, chs_value in chs_data.items():
+                chs_item = {
+                    'term': chs_key,
+                    'entity': chs_value['entity_type'],
+                    'mapping' : chs_value['mapping']
+                }
+                batch.put_item(Item=chs_item)
+
+        print("ingest {} term to ddb".format(en_data_size+chs_data_size))
 
 def load_content_json_from_s3(bucket, object_key):
     if object_key.endswith('.json'):
@@ -83,10 +98,9 @@ def process_s3_uploaded_file(bucket, object_key):
     print("********** object_key : " + object_key)
     #if want to use different aos index, the object_key format should be: ai-content/company/username/filename
 
-    response = WriteTermToDDB(bucket, object_key)
-    print("response:")
-    print(response)
-    print("ingest {} term to ddb".format(response[0]))
+    WriteTermToDDB(bucket, object_key)
+
+    
 
 ##如果是从chatbot上传，则是ai-content/username/filename
 def get_filename_from_obj_key(object_key):

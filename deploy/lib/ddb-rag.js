@@ -117,20 +117,26 @@ export class DynamoDBRagStack extends Stack {
             })
     )
 
-    const rag_meta_table = new Table(this, "rag-meta-table", {
+    const rag_meta_en_table = new Table(this, "rag-meta-en-table", {
       partitionKey: {
         name: "term",
         type: AttributeType.STRING,
       },
-      sortKey: {
-        name: "entity",
-        type: AttributeType.STRING,
-      },
-      tableName:'rag_translate_table',
+      tableName:'rag_translate_en_table',
       removalPolicy: RemovalPolicy.DESTROY,
     });
 
-    rag_meta_table.grantReadWriteData(ingest_ddb_job);
+    const rag_meta_chs_table = new Table(this, "rag-meta-chs-table", {
+      partitionKey: {
+        name: "term",
+        type: AttributeType.STRING,
+      },
+      tableName:'rag_translate_chs_table',
+      removalPolicy: RemovalPolicy.DESTROY,
+    });
+
+    rag_meta_en_table.grantReadWriteData(ingest_ddb_job);
+    rag_meta_chs_table.grantReadWriteData(ingest_ddb_job);
 
     new CfnOutput(this,'VPC',{value:vpc.vpcId});
     new CfnOutput(this,'region',{value:process.env.CDK_DEFAULT_REGION});
