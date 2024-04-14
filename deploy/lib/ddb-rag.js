@@ -1,0 +1,139 @@
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: MIT-0
+import { Stack, Duration, CfnOutput, RemovalPolicy } from "aws-cdk-lib";
+import { DockerImageFunction }  from 'aws-cdk-lib/aws-lambda';
+import { DockerImageCode,Architecture } from 'aws-cdk-lib/aws-lambda';
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as iam from "aws-cdk-lib/aws-iam";
+import * as ecr from 'aws-cdk-lib/aws-ecr';
+import { VpcStack } from './vpc-stack.js';
+import { AttributeType, Table, } from "aws-cdk-lib/aws-dynamodb";
+import * as glue from  '@aws-cdk/aws-glue-alpha';
+import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
+import * as dotenv from "dotenv";
+dotenv.config();
+
+import path from "path";
+import { fileURLToPath } from "url";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+import { join } from "path";
+export class DynamoDBRagStack extends Stack {
+  /**
+   *
+   * @param {Construct} scope
+   * @param {string} id
+   * @param {StackProps=} props
+   */
+  constructor(scope, id, props) {
+    super(scope, id, props);
+
+    const region = props.env.region;
+    const account_id = Stack.of(this).account;
+    const aos_existing_endpoint = props.env.aos_existing_endpoint;
+
+    const vpcStack = new VpcStack(this,'vpc-stack',{env:process.env});
+    const vpc = vpcStack.vpc;
+    const subnets = vpcStack.subnets;
+    const securityGroups = vpcStack.securityGroups;
+    
+    const bucket = new s3.Bucket(this, 'DocUploadBucket', {
+      removalPolicy: RemovalPolicy.DESTROY,
+      bucketName:process.env.UPLOAD_BUCKET,
+      cors:[{
+        allowedMethods: [s3.HttpMethods.GET,s3.HttpMethods.POST,s3.HttpMethods.PUT],
+        allowedOrigins: ['*'],
+        allowedHeaders: ['*'],
+      }]
+    });
+
+    const lambda_segmentor = new DockerImageFunction(this,
+      "lambda_segmentor", {
+      code: DockerImageCode.fromImageAsset(join(__dirname, "../../code/segmentor")),
+      timeout: Duration.minutes(15),
+      memorySize: 1024,
+      runtime: 'python3.9',
+      functionName: 'jieba_segmentor',
+      vpc:vpc,
+      vpcSubnets:subnets,
+      securityGroups:securityGroups,
+      architecture: Architecture.X86_64,
+      environment: {
+        user_dict_bucket:`${process.env.UPLOAD_BUCKET}`,
+        user_dict_path:'user_dict/user_dict.txt'
+      },
+    });
+
+    lambda_segmentor.addToRolePolicy(new iam.PolicyStatement({
+      // principals: [new iam.AnyPrincipal()],
+        actions: [ 
+          "s3:List*",
+          "s3:Put*",
+          "s3:Get*"
+          ],
+        effect: iam.Effect.ALLOW,
+        resources: ['*'],
+        }))
+
+    const connection = new glue.Connection(this, 'GlueJobConnection', {
+      type:glue.ConnectionType.NETWORK,
+      vpc:vpc,
+      securityGroups:securityGroups,
+      subnet:subnets[0],
+    });
+
+    const ingest_ddb_job = new glue.Job(this, 'ingest-knowledge-to-ddb',{
+          executable: glue.JobExecutable.pythonShell({
+          glueVersion: glue.GlueVersion.V1_0,
+          pythonVersion: glue.PythonVersion.THREE_NINE,
+          script: glue.Code.fromAsset(path.join(__dirname, '../../code/offline_process/ddb_write_job.py')),
+        }),
+        jobName:'ingest_knowledge2ddb',
+        maxConcurrentRuns:100,
+        maxRetries:0,
+        connections:[connection],
+        maxCapacity:1,
+        defaultArguments:{
+            '--dynamodb_table_name':'rag-translate-table',
+            '--REGION':region,
+            '--additional-python-modules': 'boto3>=1.28.52,botocore>=1.31.52',
+            '--bucket': '687752207838-24-04-10-02-26-15-aos-rag-bucket',
+            '--object_key': 'kb/multilingual_terminology.json'
+        }
+    })
+
+    ingest_ddb_job.role.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+            actions: [ 
+              "s3:List*",
+              "s3:Put*",
+              "s3:Get*",
+              "dynamodb:*",
+              ],
+            effect: iam.Effect.ALLOW,
+            resources: ['*'],
+            })
+    )
+
+    const rag_meta_table = new Table(this, "rag-meta-table", {
+      partitionKey: {
+        name: "term",
+        type: AttributeType.STRING,
+      },
+      sortKey: {
+        name: "entity",
+        type: AttributeType.STRING,
+      },
+      tableName:'rag_translate_table',
+      removalPolicy: RemovalPolicy.DESTROY,
+    });
+
+    rag_meta_table.grantReadWriteData(ingest_ddb_job);
+
+    new CfnOutput(this,'VPC',{value:vpc.vpcId});
+    new CfnOutput(this,'region',{value:process.env.CDK_DEFAULT_REGION});
+    new CfnOutput(this,'UPLOAD_BUCKET',{value:process.env.UPLOAD_BUCKET});
+  }
+}
