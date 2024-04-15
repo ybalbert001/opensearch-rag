@@ -85,20 +85,19 @@ awsauth = AWSV4SignerAuth(credentials, REGION)
 #         return result_arr
 
 class TerminologyRetriever():
-    ddb_en_table : object
-    ddb_chs_table : object
+    ddb_table : object
     segmentor_lambda_client : object
     
-    def __init__(self, ddb_meta_en_table: str, ddb_meta_chs_table: str, region:str):
+    def __init__(self, region:str):
         self.segmentor_lambda_client = boto3.client('lambda', region)
         dynamodb = boto3.resource('dynamodb', region)
-        self.ddb_en_table = dynamodb.Table(ddb_meta_en_table)
-        self.ddb_chs_table = dynamodb.Table(ddb_meta_chs_table)
+        self.ddb_chs_table = dynamodb.Table('rag_translate_chs_table')
+        self.ddb_en_table = dynamodb.Table('rag_translate_en_table')
 
-    def retrieve_term_mapping(self, src_content, target_lang):
+    def retrieve_term_mapping(self, src_content, src_lang, target_lang):
         payload = { "text" : src_content }
 
-        segment_response = lambda_client.invoke(
+        segment_response = self.segmentor_lambda_client.invoke(
             FunctionName='jieba_segmentor',
             InvocationType='RequestResponse',
             Payload=json.dumps(payload)
@@ -106,22 +105,30 @@ class TerminologyRetriever():
 
         payload_json = json.loads(segment_response.get('Payload').read())
         term_list = payload_json.get('words')
-        print("term_list")
+        print("term_list:")
         print(term_list)
 
         mapping_list = []
+        ddb_table = None
+        if src_lang == 'EN':
+            ddb_table = self.ddb_en_table
+        elif src_lang == 'CHS':
+            ddb_table = self.ddb_chs_table
+        else:
+            raise RuntimeError(f"unsupported {src_lang}")
+
         for term in term_list:
             print(f"find mapping of {term}")
-            response = self.ddb_table.get_item(Key={'term': term})
+            response = ddb_table.get_item(Key={'term': term})
+            print(response)
             if "Item" in response.keys():
-                kv_result = json.loads(response["Item"]["content"])
-                print("kv_result['mapping']")
-                mapping = kv_result['mapping']
-                entity = kv_result['entity_type']
-                mapping_list.append((term, kv_result['mapping']['target_lang'], entity))
+                item = response["Item"]
+                mapping_info = item['mapping']
+                entity = item['entity']
+                mapping_list.append((term, mapping_info[target_lang], entity))
 
         print(mapping_list)
-
+        # [('Yelan', '夜兰', 'TCG Opponent'), ('Xingqiu', '行秋', 'TCG Opponent'), ('Keqing', '刻晴', 'TCG Opponent'), ('Beidou', '北斗', 'TCG Opponent')]
         return mapping_list
 
 def construct_translate_prompt(src_content, src_lang, dest_lang, retriever):
@@ -149,31 +156,31 @@ You need to follow below instructions:
 
 Please translate directly according to the text content, keep the original format, and do not miss any information. Put the result in <translation>"""
 
-    multilingual_term_mapping = retriever.retrieve_term_mapping(src_content, dest_lang)
+    multilingual_term_mapping = retriever.retrieve_term_mapping(src_content, src_lang, dest_lang)
     crosslingual_terms = []
+
+    crosslingual_terms = [ (item[0], item[2]) for item in multilingual_term_mapping if item[0] == item[1] ]
+
+    # [('Yelan', '夜兰', 'TCG Opponent'), ('Xingqiu', '行秋', 'TCG Opponent'), ('Keqing', '刻晴', 'TCG Opponent'), ('Beidou', '北斗', 'TCG Opponent')]
 
     def build_glossaries(term, entity_type):
         obj = {"term":term, "entity_type":entity_type}
         return json.dumps(obj, ensure_ascii=False)
 
-    vocabulary_prompt_list = [ build_glossaries(item['content'], item['doc_category']) for item in crosslingual_terms ]
+    vocabulary_prompt_list = [ build_glossaries(item[0], item[1]) for item in crosslingual_terms ]
     vocabulary_prompt = "\n".join(vocabulary_prompt_list)
 
-    def build_mapping(src_lang, dest_lang, mapping_json, entity_type):
-
-        obj = json.loads(mapping_json)
-        src_term = obj.get(src_lang, None)
-        target_term = obj.get(dest_lang, None)
+    def build_mapping(src_term, target_term, entity_type):
         entity_tag = f"[{entity_type}] "
         if src_term and target_term and entity_type:
             return f"{entity_tag}{src_term}=>{target_term}"
         else:
             return None
 
-    term_mapping_list = list(set([ build_mapping(src_lang, dest_lang, item['content'], item['doc_category']) for item in multilingual_term_mapping ]))
+    term_mapping_list = list(set([ build_mapping(item[0], item[1], item[2]) for item in multilingual_term_mapping ]))
     term_mapping_prompt = "\n".join([ item for item in term_mapping_list if item is not None ])
 
-    prompt = pe_template.format(src_lang=src_lang, dest_lang=dest_lang, vocabulary=vocabulary_prompt, mappings=term_mapping_prompt, content = src_content)
+    prompt = pe_template.format(src_lang=src_lang, dest_lang=dest_lang, vocabulary=vocabulary_prompt, mappings=term_mapping_prompt, content=src_content)
     return prompt
 
 def load_content_json_from_s3(bucket, object_key):

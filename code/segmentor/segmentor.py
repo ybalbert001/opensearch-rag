@@ -52,7 +52,6 @@ def lambda_handler(event, context):
     jieba.load_userdict(local_file)
 
     text = event.get('text')
-    # text = '我在北京大学学习人工智能和机器学习'
     if not text:
         return {'error': 'Text is required'}
     
