@@ -117,6 +117,42 @@ export class DynamoDBRagStack extends Stack {
             })
     )
 
+      const rag_job = new glue.Job(this, 'rag-process',{
+            executable: glue.JobExecutable.pythonShell({
+            glueVersion: glue.GlueVersion.V1_0,
+            pythonVersion: glue.PythonVersion.THREE_NINE,
+            script: glue.Code.fromAsset(path.join(__dirname, '../../code/offline_process/rag_based_translate.py')),
+          }),
+          jobName:'rag_based_translate',
+          maxConcurrentRuns:100,
+          maxRetries:0,
+          connections:[connection],
+          maxCapacity:1,
+          defaultArguments:{
+              '--REGION':region,
+              '--additional-python-modules': 'boto3>=1.28.52,botocore>=1.31.52',
+              '--model_id': 'anthropic.claude-3-sonnet-20240229-v1:0',
+              '--object_key': 'src_files/chat_text.json',
+              '--bucket': '687752207838-24-04-10-02-26-15-aos-rag-bucket'
+          }
+      })
+      rag_job.role.addToPrincipalPolicy(
+        new iam.PolicyStatement({
+              actions: [ 
+                "sagemaker:InvokeEndpointAsync",
+                "sagemaker:InvokeEndpoint",
+                "s3:List*",
+                "s3:Put*",
+                "s3:Get*",
+                "dynamodb:*",
+                "bedrock:*",
+                "lambda:InvokeFunction",
+                ],
+              effect: iam.Effect.ALLOW,
+              resources: ['*'],
+              })
+      )
+
     const rag_meta_en_table = new Table(this, "rag-meta-en-table", {
       partitionKey: {
         name: "term",
@@ -137,6 +173,8 @@ export class DynamoDBRagStack extends Stack {
 
     rag_meta_en_table.grantReadWriteData(ingest_ddb_job);
     rag_meta_chs_table.grantReadWriteData(ingest_ddb_job);
+    rag_meta_en_table.grantReadWriteData(rag_job);
+    rag_meta_chs_table.grantReadWriteData(rag_job);
 
     new CfnOutput(this,'VPC',{value:vpc.vpcId});
     new CfnOutput(this,'region',{value:process.env.CDK_DEFAULT_REGION});

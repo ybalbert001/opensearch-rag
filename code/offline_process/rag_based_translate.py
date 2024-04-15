@@ -19,14 +19,12 @@ from urllib.parse import unquote
 from datetime import datetime
 import time
 
-args = getResolvedOptions(sys.argv, ['bucket', 'object_key', 'model_id', 'AOS_ENDPOINT', 'REGION', 'AOS_INDEX'])
+args = getResolvedOptions(sys.argv, ['bucket', 'object_key', 'model_id', 'REGION'])
 
 bucket = args['bucket']
 object_key = args['object_key']
 model_id = args['model_id']
 
-AOS_ENDPOINT = args['AOS_ENDPOINT']
-AOS_INDEX = args['AOS_INDEX']
 REGION = args['REGION']
 
 s3 = boto3.resource('s3', REGION)
@@ -125,7 +123,7 @@ class TerminologyRetriever():
                 item = response["Item"]
                 mapping_info = item['mapping']
                 entity = item['entity']
-                mapping_list.append((term, mapping_info[target_lang], entity))
+                mapping_list.append([term, mapping_info[target_lang], entity])
 
         print(mapping_list)
         # [('Yelan', '夜兰', 'TCG Opponent'), ('Xingqiu', '行秋', 'TCG Opponent'), ('Keqing', '刻晴', 'TCG Opponent'), ('Beidou', '北斗', 'TCG Opponent')]
@@ -181,7 +179,7 @@ Please translate directly according to the text content, keep the original forma
     term_mapping_prompt = "\n".join([ item for item in term_mapping_list if item is not None ])
 
     prompt = pe_template.format(src_lang=src_lang, dest_lang=dest_lang, vocabulary=vocabulary_prompt, mappings=term_mapping_prompt, content=src_content)
-    return prompt
+    return prompt, multilingual_term_mapping
 
 def load_content_json_from_s3(bucket, object_key):
     if object_key.endswith('.json'):
@@ -243,11 +241,11 @@ def translate_by_llm(file_content, model_id):
     dest_lang = json_obj['dest_lang']
     src_content_list = json_obj['src_content']
 
-    retriever = TerminologyRetriever.from_endpoints(AOS_ENDPOINT, AOS_INDEX)
+    retriever = TerminologyRetriever(REGION)
 
     dest_content_list = []
     for content in src_content_list:
-        prompt = construct_translate_prompt(content, src_lang, dest_lang, retriever)
+        prompt, multilingual_term_mapping = construct_translate_prompt(content, src_lang, dest_lang, retriever)
         print("prompt:")
         print(prompt)
 
@@ -255,6 +253,7 @@ def translate_by_llm(file_content, model_id):
         dest_content_list.append(result)
 
     json_obj["dest_content"] = dest_content_list
+    json_obj["term_mapping"] = multilingual_term_mapping
     return json_obj
 
 def get_output_path_from_objectkey(object_key):
