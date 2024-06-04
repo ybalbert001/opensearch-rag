@@ -62,10 +62,10 @@ def get_aos_client(aos_endpoint):
 
     return aos_client
 
-def moderate_by_llm(model_id, system_prompt, instruct_prompt):
+def moderate_by_llm(model_id, system_prompt, instruct_prompt, content):
     messages = [ 
         {"role":"user", "content" : instruct_prompt },
-        {"role":"assistant", "content": "\n<moderation>"}
+        {"role":"assistant", "content": f"<moderation><content>{content}</content><result>"}
     ]
 
     input_body = {}
@@ -92,7 +92,7 @@ def moderate_by_llm(model_id, system_prompt, instruct_prompt):
 
     output = body_dict['content'][0].get("text")
 
-    return output
+    return f"<content>{content}</content><result>" + output
 
 def retrieve_from_aos(aos_index, aos_endpoint, text, text_type):
     retrieve_client = get_aos_client(aos_endpoint)
@@ -127,13 +127,51 @@ def retrieve_from_aos(aos_index, aos_endpoint, text, text_type):
             "doc_category"
         ]
     }
-    print("white_query:")
-    print(white_query)
+
+    {'took': 2, 'timed_out': False, '_shards': {'total': 5, 'successful': 5, 'skipped': 0, 'failed': 0}, 'hits': {'total': {'value': 0, 'relation': 'eq'}, 'max_score': None, 'hits': []}}
 
     white_response = retrieve_client.search(
         body=white_query,
         index=aos_index
     )
+
+    # 如果没有命中
+    if not white_response['hits']['hits']:
+        white_query = {
+            "query" : {
+                "bool": {
+                    "must": [
+                        {
+                          "match_all": {}
+                        }
+                    ],
+                    "filter": [
+                        {
+                          "term": {
+                            "doc_title": f"moderation_{text_type}_white"
+                          }
+                        },
+                        {
+                          "match": {
+                            "doc_category": "Whitelist"
+                          }
+                        }
+                    ]
+                }
+            },
+            "size" : 5,
+            "_source": [
+                "doc",
+                "content",
+                "doc_title",
+                "doc_category"
+            ]
+        }
+        white_response = retrieve_client.search(
+            body=white_query,
+            index=aos_index
+        )
+
 
     black_query = {
         "query" : {
@@ -166,14 +204,47 @@ def retrieve_from_aos(aos_index, aos_endpoint, text, text_type):
         ]
     }
 
-    print("black_query:")
-    print(black_query)
-
     black_response = retrieve_client.search(
         body=black_query,
-        index=aos_index,
-
+        index=aos_index
     )
+
+    if not black_response['hits']['hits']:
+        black_query = {
+            "query" : {
+                "bool": {
+                    "must": [
+                        {
+                          "match_all": {}
+                        }
+                    ],
+                    "filter": [
+                        {
+                          "term": {
+                            "doc_title": f"moderation_{text_type}_black"
+                          }
+                        },
+                        {
+                          "match": {
+                            "doc_category": "Blacklist"
+                          }
+                        }
+                    ]
+                }
+            },
+            "size" : 5,
+            "_source": [
+                "doc",
+                "content",
+                "doc_title",
+                "doc_category"
+            ]
+        }
+
+        black_response = retrieve_client.search(
+            body=black_query,
+            index=aos_index
+        )
 
     return white_response, black_response
 
@@ -184,8 +255,8 @@ def build_moderate_prompt(white_examples, black_examples, content):
         exmples = []
         for hit in hits:
             content = hit['_source']['doc']
-            explaination = hit['_source']['content']
-            exmples.append(f"<moderation><content>{content}</content><result>{result}</result><explaination>{explaination}</explaination></moderation>")
+            explanation = hit['_source']['content']
+            exmples.append(f"<moderation><content>{content}</content><result>{result}</result><explanation>{explanation}</explanation></moderation>")
 
         return "\n".join(exmples)
 
@@ -265,7 +336,7 @@ def build_moderate_prompt(white_examples, black_examples, content):
     The content within the <content> tag below is pending review. 
     <content>{content}<content>
 
-    Please provide your moderation result in <moderation> tag."""  
+    Please provide the result of content moderation, and output between <moderation> tag."""  
 
     return system_prompt, instruct_prompt
 
@@ -287,24 +358,15 @@ def lambda_handler(event, context):
     text_type = event.get('type') # it could be 'nickname' and 'motto'
 
     white_response, black_response = retrieve_from_aos(aos_index, aos_endpoint, text, text_type)
-
-    print("white_response:")
-    print(white_response)
-
-    print("black_response:")
-    print(black_response)
-
     system_prompt, instruct_prompt = build_moderate_prompt(white_response, black_response, text)
 
-    print("system_prompt:")
-    print(system_prompt)
-
-    print("instruct_prompt:")
-    print(instruct_prompt)
-
-    xml_output = moderate_by_llm(model_id, system_prompt, instruct_prompt, )
+    xml_output = moderate_by_llm(model_id, system_prompt, instruct_prompt, text)
 
     result = extract_tag_content(xml_output)
+
+    if not result:
+        print("xml_output:")
+        print(xml_output)
 
     return result
 
