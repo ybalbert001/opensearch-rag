@@ -73,18 +73,17 @@ def iterate_items(file_content, object_key):
         print(f"doc_type:{doc_type}, author:{author}")
 
         for idx, item in enumerate(arr):
-            doc = item["terms"]                 #aos doc字段
-            content_type = item["content_type"] #aos doc_category字段
-            reason = item["reason"]             #aos content字段
-            lang = item["lang"]                 #aos lang字段
+            doc = item.get('nick_name', item.get('motto'))   #aos doc字段
+            content_type = item["content_type"]              #aos doc_category字段
+            reason = item["reason"]                          #aos content字段
+            lang = item["lang"]                              #aos lang字段
 
-            for term in item["terms"]:
-                try:
-                    document = { "publish_date": publish_date, "doc" : doc, "idx": idx, "doc_type" : doc_type, "content" : reason, "doc_title": file_name, "doc_author": author, "doc_category": content_type}
-                    yield {"_index": AOS_INDEX, "_source": document, "_id": hashlib.md5(str(document).encode('utf-8')).hexdigest()}
-                except Exception as e:
-                    print(f"failed to process, {str(e)}")
-                    
+            try:
+                document = { "publish_date": publish_date, "doc" : doc, "idx": idx, "doc_type" : doc_type, "content" : reason, "doc_title": file_name, "doc_author": author, "doc_category": content_type}
+                yield {"_index": AOS_INDEX, "_source": document, "_id": hashlib.md5(str(document).encode('utf-8')).hexdigest()}
+            except Exception as e:
+                print(f"failed to process, {str(e)}")
+
 def load_content_json_from_s3(bucket, object_key):
     if object_key.endswith('.json'):
         obj = s3.Object(bucket, object_key)

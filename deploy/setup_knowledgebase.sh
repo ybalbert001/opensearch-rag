@@ -26,12 +26,12 @@ payload1="{
             },
             \"doc\": {
                 \"type\": \"text\",
-                \"analyzer\": \"ik_max_word\",
+                \"analyzer\": \"standard\",
                 \"search_analyzer\": \"ik_smart\"
             },
             \"content\": {
                 \"type\": \"text\",
-                \"analyzer\": \"ik_max_word\",
+                \"analyzer\": \"standard\",
                 \"search_analyzer\": \"ik_smart\"
             },
             \"doc_title\": {

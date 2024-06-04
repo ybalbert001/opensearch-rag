@@ -83,33 +83,35 @@ export class DeployStack extends Stack {
     new CfnOutput(this, `Glue RAG Job name`,{value:`${gluestack.ragJobName}`});
     gluestack.addDependency(vpcStack)
 
-    const lambda_segmentor = new DockerImageFunction(this,
-      "lambda_segmentor", {
-      code: DockerImageCode.fromImageAsset(join(__dirname, "../../code/segmentor")),
+    const lambda_moderator = new DockerImageFunction(this,
+      "lambda_moderator", {
+      code: DockerImageCode.fromImageAsset(join(__dirname, "../../code/online_moderator")),
       timeout: Duration.minutes(15),
       memorySize: 1024,
       runtime: 'python3.9',
-      functionName: 'jieba_segmentor',
+      functionName: 'rag_moderator',
       vpc:vpc,
       vpcSubnets:subnets,
       securityGroups:securityGroups,
       architecture: Architecture.X86_64,
       environment: {
-        user_dict_bucket:`${process.env.UPLOAD_BUCKET}`,
-        user_dict_path:'user_dict/user_dict.txt'
+        aos_index:'rag-data-index',
+        aos_endpoint:opensearch_endpoint,
+        region:region
       },
     });
 
-    lambda_segmentor.addToRolePolicy(new iam.PolicyStatement({
+    lambda_moderator.addToRolePolicy(new iam.PolicyStatement({
       // principals: [new iam.AnyPrincipal()],
         actions: [ 
           "s3:List*",
           "s3:Put*",
-          "s3:Get*"
+          "s3:Get*",
+          "es:*",
+          "bedrock:InvokeModel*"
           ],
         effect: iam.Effect.ALLOW,
         resources: ['*'],
         }))
-
   }
 }
