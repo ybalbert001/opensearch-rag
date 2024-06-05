@@ -256,14 +256,14 @@ def build_moderate_prompt(white_examples, black_examples, content):
             content = hit['_source']['content']
             explanation = hit['_source']['reason']
             category = hit['_source']['category']
-            exmples.append(f"<moderation><content>{content}</content><result>{result}</result><category>{category}</category><explanation>{explanation}</explanation></moderation>")
+            exmples.append(f"<moderation><content>{content}</content><result>{result}</result><category>{category}</category><explanation>{explanation}</explanation><confidence>...</confidence></moderation>")
 
         return "\n".join(exmples)
 
     white_examples_part = reformat(white_examples, "pass")
     black_examples_part = reformat(black_examples, "reject")
 
-    system_prompt = """You are a content moderation assistant trained to detect inappropriate content from user. """
+    system_prompt = """You are a content moderation assistant of Mihoyo, you are trained to detect inappropriate content from user. """
         
     instruct_prompt = f"""Your task is to Identify and classify any inappropriate content in the given nick_names according to below policies
 
@@ -336,7 +336,10 @@ def build_moderate_prompt(white_examples, black_examples, content):
     The content within the <content> tag below is pending review. 
     <content>{content}<content>
 
-    Please provide the result of content moderation, and output between <moderation> tag."""  
+    Please remember below requirements:
+    1. You are facing the Mihoyo game scenario, so some combat and weapon-related terms are normal. 
+    2. When outputting, please also output a <confidence> value, with a score range of 1-5. The less confident you are about judging the content, the lower the score you should give.
+    3. The output should be between <moderation> and </moderation>."""  
 
     return system_prompt, instruct_prompt
 
