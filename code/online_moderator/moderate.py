@@ -63,6 +63,10 @@ def get_aos_client(aos_endpoint):
     return aos_client
 
 def moderate_by_llm(model_id, system_prompt, instruct_prompt, content):
+
+    print("instruct_prompt:")
+    print(instruct_prompt)
+
     messages = [ 
         {"role":"user", "content" : instruct_prompt },
         {"role":"assistant", "content": f"<moderation><content>{content}</content><result>"}
@@ -222,7 +226,7 @@ def retrieve_from_aos(aos_index, aos_endpoint, text, text_type):
                         },
                         {
                           "match": {
-                            "doc_category": "Blacklist"
+                            "assessment": "Blacklist"
                           }
                         }
                     ]
