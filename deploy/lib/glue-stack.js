@@ -48,8 +48,9 @@ export class GlueStack extends NestedStack {
               '--REGION':props.region,
               '--AOS_INDEX': "rag-data-index",
               '--additional-python-modules': 'boto3>=1.28.52,botocore>=1.31.52',
-              '--bucket': '687752207838-24-04-10-02-26-15-aos-rag-bucket',
-              '--object_key': 'kb/crosslingual_terminology.json,kb/multilingual_terminology.json'
+              '--bucket': props.bucketname,
+              '--field_name': 'motto',
+              '--object_key': 'kb/moderation_motto_black.json,kb/moderation_motto_white.json'
           }
       })
       ingest_job.role.addToPrincipalPolicy(

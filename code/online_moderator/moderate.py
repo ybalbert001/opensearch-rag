@@ -97,23 +97,24 @@ def moderate_by_llm(model_id, system_prompt, instruct_prompt, content):
 def retrieve_from_aos(aos_index, aos_endpoint, text, text_type):
     retrieve_client = get_aos_client(aos_endpoint)
 
+    # { "content": content, "category" : category, "reason": reason, "assessment" : content_type, "lang" : lang, "doc_title": file_name}
     white_query = {
         "query" : {
             "bool": {
                 "must": [
                     {
-                      "match": { "doc": text }
+                      "match": { "content": text }
                     }
                 ],
                 "filter": [
                     {
                       "term": {
-                        "doc_title": f"moderation_{text_type}_white"
+                        "content_type": text_type
                       }
                     },
                     {
                       "match": {
-                        "doc_category": "Whitelist"
+                        "assessment": "Whitelist"
                       }
                     }
                 ]
@@ -121,14 +122,11 @@ def retrieve_from_aos(aos_index, aos_endpoint, text, text_type):
         },
         "size" : 5,
         "_source": [
-            "doc",
             "content",
-            "doc_title",
-            "doc_category"
+            "category",
+            "reason"
         ]
     }
-
-    {'took': 2, 'timed_out': False, '_shards': {'total': 5, 'successful': 5, 'skipped': 0, 'failed': 0}, 'hits': {'total': {'value': 0, 'relation': 'eq'}, 'max_score': None, 'hits': []}}
 
     white_response = retrieve_client.search(
         body=white_query,
@@ -148,12 +146,12 @@ def retrieve_from_aos(aos_index, aos_endpoint, text, text_type):
                     "filter": [
                         {
                           "term": {
-                            "doc_title": f"moderation_{text_type}_white"
+                            "content_type": text_type
                           }
                         },
                         {
                           "match": {
-                            "doc_category": "Whitelist"
+                            "assessment": "Whitelist"
                           }
                         }
                     ]
@@ -161,10 +159,9 @@ def retrieve_from_aos(aos_index, aos_endpoint, text, text_type):
             },
             "size" : 5,
             "_source": [
-                "doc",
                 "content",
-                "doc_title",
-                "doc_category"
+                "category",
+                "reason"
             ]
         }
         white_response = retrieve_client.search(
@@ -178,18 +175,18 @@ def retrieve_from_aos(aos_index, aos_endpoint, text, text_type):
             "bool": {
                 "must": [
                     {
-                      "match": { "doc": text }
+                      "match": { "content": text }
                     }
                 ],
                 "filter": [
                     {
                       "term": {
-                        "doc_title": f"moderation_{text_type}_black"
+                        "content_type": text_type
                       }
                     },
                     {
                       "match": {
-                        "doc_category": "Blacklist"
+                        "assessment": "Blacklist"
                       }
                     }
                 ]
@@ -197,10 +194,9 @@ def retrieve_from_aos(aos_index, aos_endpoint, text, text_type):
         },
         "size" : 5,
         "_source": [
-            "doc",
             "content",
-            "doc_title",
-            "doc_category"
+            "category",
+            "reason"
         ]
     }
 
@@ -221,7 +217,7 @@ def retrieve_from_aos(aos_index, aos_endpoint, text, text_type):
                     "filter": [
                         {
                           "term": {
-                            "doc_title": f"moderation_{text_type}_black"
+                            "content_type": text_type
                           }
                         },
                         {
@@ -234,10 +230,9 @@ def retrieve_from_aos(aos_index, aos_endpoint, text, text_type):
             },
             "size" : 5,
             "_source": [
-                "doc",
                 "content",
-                "doc_title",
-                "doc_category"
+                "category",
+                "reason"
             ]
         }
 
@@ -254,9 +249,10 @@ def build_moderate_prompt(white_examples, black_examples, content):
         hits = aos_result['hits']['hits']
         exmples = []
         for hit in hits:
-            content = hit['_source']['doc']
-            explanation = hit['_source']['content']
-            exmples.append(f"<moderation><content>{content}</content><result>{result}</result><explanation>{explanation}</explanation></moderation>")
+            content = hit['_source']['content']
+            explanation = hit['_source']['reason']
+            category = hit['_source']['category']
+            exmples.append(f"<moderation><content>{content}</content><result>{result}</result><category>{category}</category><explanation>{explanation}</explanation></moderation>")
 
         return "\n".join(exmples)
 

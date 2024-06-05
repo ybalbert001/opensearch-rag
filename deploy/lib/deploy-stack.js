@@ -77,8 +77,9 @@ export class DeployStack extends Stack {
     new CfnOutput(this,'region',{value:process.env.CDK_DEFAULT_REGION});
     new CfnOutput(this,'UPLOAD_BUCKET',{value:process.env.UPLOAD_BUCKET});
 
+    const bucketname = process.env.UPLOAD_BUCKET
     //glue job
-    const gluestack = new GlueStack(this,'glue-stack',{opensearch_endpoint,region,vpc,subnets,securityGroups});
+    const gluestack = new GlueStack(this,'glue-stack',{opensearch_endpoint,region,vpc,subnets,securityGroups,bucketname});
     new CfnOutput(this, `Glue Ingest Job name`,{value:`${gluestack.jobName}`});
     new CfnOutput(this, `Glue RAG Job name`,{value:`${gluestack.ragJobName}`});
     gluestack.addDependency(vpcStack)

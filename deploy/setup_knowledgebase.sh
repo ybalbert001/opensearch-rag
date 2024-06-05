@@ -14,39 +14,27 @@ payload1="{
     },
     \"mappings\": {
         \"properties\": {
-            \"publish_date\" : {
-                \"type\": \"date\",
-                \"format\": \"yyyy-MM-dd HH:mm:ss\"
-            },
-            \"idx\" : {
-                \"type\": \"integer\"
-            },
-            \"doc_type\" : {
-                \"type\" : \"keyword\"
-            },
-            \"doc\": {
-                \"type\": \"text\",
-                \"analyzer\": \"standard\",
-                \"search_analyzer\": \"ik_smart\"
-            },
             \"content\": {
                 \"type\": \"text\",
                 \"analyzer\": \"standard\",
                 \"search_analyzer\": \"ik_smart\"
             },
+            \"content_type\": {
+                \"type\": \"keyword\"
+            },
+            \"category\": {
+                \"type\": \"keyword\"
+            },
+            \"reason\": {
+                \"type\": \"keyword\"
+            },
+            \"assessment\": {
+                \"type\": \"keyword\"
+            },
+            \"lang\": {
+                \"type\": \"keyword\"
+            },
             \"doc_title\": {
-                \"type\": \"keyword\"
-            },
-            \"doc_author\": {
-                \"type\": \"keyword\"
-            },
-            \"doc_category\": {
-                \"type\": \"keyword\"
-            },
-            \"doc_meta\": {
-                \"type\": \"keyword\"
-            },
-            \"doc_classify\": {
                 \"type\": \"keyword\"
             },
             \"embedding\": {

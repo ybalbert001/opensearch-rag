@@ -18,7 +18,7 @@ import numpy as np
 from urllib.parse import unquote
 from datetime import datetime
 
-args = getResolvedOptions(sys.argv, ['bucket', 'object_key','AOS_ENDPOINT','REGION','AOS_INDEX'])
+args = getResolvedOptions(sys.argv, ['bucket', 'object_key','AOS_ENDPOINT','REGION','AOS_INDEX', 'field_name'])
 s3 = boto3.resource('s3')
 bucket = args['bucket']
 object_key = args['object_key']
@@ -26,6 +26,7 @@ object_key = args['object_key']
 AOS_ENDPOINT = args['AOS_ENDPOINT']
 AOS_INDEX = args['AOS_INDEX']
 REGION = args['REGION']
+field_name = args['field_name']
 
 bedrock = boto3.client(service_name='bedrock-runtime',
                        region_name=REGION)
@@ -73,13 +74,14 @@ def iterate_items(file_content, object_key):
         print(f"doc_type:{doc_type}, author:{author}")
 
         for idx, item in enumerate(arr):
-            doc = item.get('nick_name', item.get('motto'))   #aos doc字段
+            content = item.get(field_name)   #aos doc字段
             content_type = item["content_type"]              #aos doc_category字段
             reason = item["reason"]                          #aos content字段
+            category = item["category"]
             lang = item["lang"]                              #aos lang字段
 
             try:
-                document = { "publish_date": publish_date, "doc" : doc, "idx": idx, "doc_type" : doc_type, "content" : reason, "doc_title": file_name, "doc_author": author, "doc_category": content_type}
+                document = { "content": content, "category" : category, "reason": reason, "assessment" : content_type, "lang" : lang, "content_type": field_name ,"doc_title": file_name}
                 yield {"_index": AOS_INDEX, "_source": document, "_id": hashlib.md5(str(document).encode('utf-8')).hexdigest()}
             except Exception as e:
                 print(f"failed to process, {str(e)}")
