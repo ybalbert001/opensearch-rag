@@ -1,0 +1,20 @@
+{
+    "type":"moderation",
+    "author":"",
+    "data":[
+        {
+            "motto":"es un gran videojuego sexo",
+            "category":"Sexual content",
+            "reason":"This Spanish phrase translates to \"it's a great sex video game\" and contains explicit sexual references.",
+            "content_type":"Blacklist",
+            "lang":"es"
+        },
+        {
+            "motto":"JAWIR PANTAT HITAM",
+            "category":"Violent Abuse",
+            "reason":"This phrase in Indonesian could be considered offensive hate speech.",
+            "content_type":"Blacklist",
+            "lang":"en"
+        }
+    ]
+}
