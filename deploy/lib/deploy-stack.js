@@ -81,7 +81,6 @@ export class DeployStack extends Stack {
     //glue job
     const gluestack = new GlueStack(this,'glue-stack',{opensearch_endpoint,region,vpc,subnets,securityGroups,bucketname});
     new CfnOutput(this, `Glue Ingest Job name`,{value:`${gluestack.jobName}`});
-    new CfnOutput(this, `Glue RAG Job name`,{value:`${gluestack.ragJobName}`});
     gluestack.addDependency(vpcStack)
 
     const lambda_moderator = new DockerImageFunction(this,
