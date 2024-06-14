@@ -339,11 +339,51 @@ def build_moderate_prompt(white_examples, black_examples, content):
     1. You are facing the Mihoyo game scenario, so some combat and weapon-related terms are normal. 
     2. Please follow the output format in <Precedents>, give the explanation at first and then output the result, category and confidence.
     3. The <confidence> value is with a score range of 1-5. The less confident you are about judging the content, the lower the score you should give.
+    4. There are only two options(reject, pass) for your result.
+    5. If the content doesn't directly 
 
     Below is the content which is pending review. 
     <content>{content}<content>"""  
 
-    return system_prompt, instruct_prompt
+
+    system_prompt_v2 = """You are a content moderation assistant responsible for reviewing text content to ensure they comply with community guidelines."""
+    instruct_prompt_v2 = f"""<guidelines>
+1. Hate speech, discrimination, or bias against protected groups (e.g., race, religion, gender, sexual orientation) is not allowed.
+2. Explicit or graphic violence, gore, or illegal activities should not be allowed. To express negative emotions like dissatisfaction, anger, and frustration, the use of violent and rude words and expressions is tolerated.
+3. Sexually explicit or pornographic content is not permitted while implicit, suggestive sexual content is tolerated
+4. Some national swear words, such as '他妈的', 'fucking', 'damn', etc., should not be considered profanity, vulgarity, or obscene language.
+5. Harassment, bullying, or personal attacks towards individuals or groups are not allowed. 
+6. Misinformation, conspiracy theories, or harmful pseudoscience should be flagged.
+7. Content that promotes self-harm, eating disorders, or dangerous behaviors is not allowed.
+8. Spam, phishing attempts, or unauthorized commercial content should be removed.
+</guidelines>
+
+Here are some examples to help you understand the guidelines:
+
+<examples>
+<Whitelist>
+{white_examples_part}
+</Whitelist>
+
+<Blacklist>
+{black_examples_part}
+</Blacklist>
+</examples>
+
+To complete your task, please follow these steps:
+
+1. Review the given text input carefully.
+2. Identify any content that violates the guidelines mentioned above.
+3. Please follow the output format in <examples>, give the explanation at first and then output the result, category and confidence. 
+4. If the content is appropriate and complies with all guidelines, mark the Result as "pass".
+5. If the content is risky, potentially violates guidelines, or you are unsure, mark the Result as "review".
+6. If the content explicitly violates any guidelines, mark the Result as "reject" and specify the violated Category.
+
+Here is the content:
+<content>{content}</content>
+"""
+
+    return system_prompt_v2, instruct_prompt_v2
 
 def extract_tag_content(xml_string):
     tag_contents = {}
