@@ -69,7 +69,7 @@ def moderate_by_llm(model_id, system_prompt, instruct_prompt, content):
 
     messages = [ 
         {"role":"user", "content" : instruct_prompt },
-        {"role":"assistant", "content": f"<moderation><content>{content}</content><result>"}
+        {"role":"assistant", "content": f"<moderation><content>{content}</content><explanation>"}
     ]
 
     input_body = {}
@@ -96,7 +96,7 @@ def moderate_by_llm(model_id, system_prompt, instruct_prompt, content):
 
     output = body_dict['content'][0].get("text")
 
-    return f"<content>{content}</content><result>" + output
+    return f"<content>{content}</content><explanation>" + output
 
 def retrieve_from_aos(aos_index, aos_endpoint, text, text_type):
     retrieve_client = get_aos_client(aos_endpoint)
@@ -137,6 +137,7 @@ def retrieve_from_aos(aos_index, aos_endpoint, text, text_type):
         index=aos_index
     )
 
+    default_white_response = {}
     # 如果没有命中
     if not white_response['hits']['hits']:
         white_query = {
@@ -168,11 +169,10 @@ def retrieve_from_aos(aos_index, aos_endpoint, text, text_type):
                 "reason"
             ]
         }
-        white_response = retrieve_client.search(
+        default_white_response = retrieve_client.search(
             body=white_query,
             index=aos_index
         )
-
 
     black_query = {
         "query" : {
@@ -209,6 +209,7 @@ def retrieve_from_aos(aos_index, aos_endpoint, text, text_type):
         index=aos_index
     )
 
+    default_black_response = {}
     if not black_response['hits']['hits']:
         black_query = {
             "query" : {
@@ -240,12 +241,12 @@ def retrieve_from_aos(aos_index, aos_endpoint, text, text_type):
             ]
         }
 
-        black_response = retrieve_client.search(
+        default_black_response = retrieve_client.search(
             body=black_query,
             index=aos_index
         )
 
-    return white_response, black_response
+    return white_response, black_response, default_white_response, default_black_response
 
 def build_moderate_prompt(white_examples, black_examples, content):
 
@@ -256,7 +257,7 @@ def build_moderate_prompt(white_examples, black_examples, content):
             content = hit['_source']['content']
             explanation = hit['_source']['reason']
             category = hit['_source']['category']
-            exmples.append(f"<moderation><content>{content}</content><result>{result}</result><category>{category}</category><explanation>{explanation}</explanation><confidence>...</confidence></moderation>")
+            exmples.append(f"<moderation><content>{content}</content><explanation>{explanation}</explanation><result>{result}</result><category>{category}</category><confidence>...</confidence></moderation>")
 
         return "\n".join(exmples)
 
@@ -265,7 +266,7 @@ def build_moderate_prompt(white_examples, black_examples, content):
 
     system_prompt = """You are a content moderation assistant of Mihoyo, you are trained to detect inappropriate content from user. """
         
-    instruct_prompt = f"""Your task is to Identify and classify any inappropriate content in the given nick_names according to below policies
+    instruct_prompt = f"""Your task is to Identify and classify any inappropriate content in the given motto according to below policies and precedents.
 
     <policies>
     # Account Trade:
@@ -324,7 +325,7 @@ def build_moderate_prompt(white_examples, black_examples, content):
     High: Texts mentioning or promoting suicide challenges, such as momo challenge and blue whale challenge
     </policies>
 
-    You can also refer below precedents in Whitelist and Blacklist:
+    <Precedents>
     <Whitelist>
     {white_examples_part}
     </Whitelist>
@@ -332,14 +333,15 @@ def build_moderate_prompt(white_examples, black_examples, content):
     <Blacklist>
     {black_examples_part}
     </Blacklist>
-
-    The content within the <content> tag below is pending review. 
-    <content>{content}<content>
+    </Precedents>
 
     Please remember below requirements:
     1. You are facing the Mihoyo game scenario, so some combat and weapon-related terms are normal. 
-    2. When outputting, please also output a <confidence> value, with a score range of 1-5. The less confident you are about judging the content, the lower the score you should give.
-    3. The output should be between <moderation> and </moderation>."""  
+    2. Please follow the output format in <Precedents>, give the explanation at first and then output the result, category and confidence.
+    3. The <confidence> value is with a score range of 1-5. The less confident you are about judging the content, the lower the score you should give.
+
+    Below is the content which is pending review. 
+    <content>{content}<content>"""  
 
     return system_prompt, instruct_prompt
 
@@ -360,16 +362,23 @@ def lambda_handler(event, context):
     text = event.get('text')
     text_type = event.get('type') # it could be 'nickname' and 'motto'
 
-    white_response, black_response = retrieve_from_aos(aos_index, aos_endpoint, text, text_type)
+    query_white_response, query_black_response, default_white_response, default_black_response = retrieve_from_aos(aos_index, aos_endpoint, text, text_type)
+    white_response_cnt = len(query_white_response['hits']['hits'])
+    black_response_cnt = len(query_black_response['hits']['hits'])
+
+    white_response = query_white_response if white_response_cnt else default_white_response
+    black_response = query_black_response if black_response_cnt else default_black_response
+
     system_prompt, instruct_prompt = build_moderate_prompt(white_response, black_response, text)
 
     xml_output = moderate_by_llm(model_id, system_prompt, instruct_prompt, text)
-
     result = extract_tag_content(xml_output)
 
-    if not result:
-        print("xml_output:")
-        print(xml_output)
+    print("xml_output:")
+    print(xml_output)
+
+    result["white_response_cnt"] = white_response_cnt
+    result["black_response_cnt"] = black_response_cnt
 
     return result
 
