@@ -69,7 +69,8 @@ def moderate_by_llm(model_id, system_prompt, instruct_prompt, content):
 
     messages = [ 
         {"role":"user", "content" : instruct_prompt },
-        {"role":"assistant", "content": f"<moderation><content>{content}</content><explanation>"}
+        #{"role":"assistant", "content": f"<moderation><content>{content}</content><explanation>"}
+        {"role":"assistant", "content": f"OK, in addition to these instructions, i also noticed some additional points raised in <policies>.\n Here is my output: \n<moderation><content>{content}</content><explanation>"}
     ]
 
     input_body = {}
@@ -513,7 +514,93 @@ To complete your task, please follow these steps:
 Below is the content which is pending review. 
 <content>{content}<content>"""
 
-    return system_prompt_v4, instruct_prompt_v4
+    # i will remove instruct to prefill to emphasize them
+    instruct_prompt_v5 = f"""Here is the policies of moderation:
+
+<policies>
+# Account Trade:
+Low: Asking for account services, mentioning account trade experiences, promoting account giveaways/exchanges.
+Middle: Providing account trading or account services for currency.
+
+# Scams & Advertisements:
+Middle: Promoting phishing websites, free primogems, hack services, refund services, or advertisements with purchase links/contact info.
+
+# Information Leakage:
+Low: Mentioning information leakage events, blacklisted websites.
+Middle: Discussing or sharing leaked information.
+
+# Verbal Abuse & Threats:
+Low: Offensive speech, personal attacks, hate speech towards subjects.
+Middle: Personal attacks, hate speech, threats towards individuals/groups.
+Note that additionally: 
+1. You are facing the Mihoyo game scenario, so some combat, weapon and game-related terms should be tolerated.
+2. For expressing negative strong negative sentiment to game/game experience, like dissatisfaction, anger, and frustration, the use of violent/insult/vulgar words should be tolerated.
+3. Some national swear words, such as '他妈的', 'fucking', 'damn', etc., should be tolerated.
+
+# Sensitivity & Nudity:
+Low: Mentioning private parts, sexual activities, asking for sexual services, insult words or discrimination to LGBT(gay, lesbian, etc)
+Middle: Providing or promoting sexual services and websites
+High: Any Discrimination against LGBT
+Note that additionally: 
+1. Implicit, suggestive or ambiguous sexual contents should be tolerated.
+
+# Minor Safety:
+Low: Grooming behavior, normalizing pedophilia, admitting romantic relationships with minors.
+Middle: Sexual content involving minors.
+High: Providing sexual services involving minors, revealing account owner is under 13.
+
+# Illegal Activities:
+Low: Simply mentioning illegal goods/activities, temptation of committing crimes, fake news, conspiracy theories.
+Low example:
+1. yeah i know weed is better than tobacco
+2. have you ever try coccaine?
+High: Actually promoting illegal goods/activities, glorifying illegal activities.
+High example:
+1. Weeds on sale
+2. Guns on sale, visit this page
+
+# Religious and Political Content:
+High: Discussing REAL WORLD (NOT IN GAME) war conflicts, territorial disputes, military installations, diplomatic relationships, political events, entities, desecrating symbols, persuading beliefs, political statements, support/opposition, controversial flags/slogans, Chinese politics.
+
+# Personal Identifiable Information:
+Low: Depicting personal information like phone numbers, addresses, IDs, bank accounts.
+
+# Violent Extremism:
+Low: Mentioning extremisms, hate ideologies like terrorism, white supremacy, Nazism.
+High: Promoting extremisms, hate ideologies.
+
+# Suicide & Self-Harm:
+Low: Texts depicting trustworthy suicidal tendency. 
+Low example:
+1. I'm so tired, I want to kill myself
+High: Texts mentioning or promoting suicide challenges, such as momo challenge and blue whale challenge
+</policies>
+
+Here are some examples to help you understand the policies:
+
+<examples>
+<Whitelist>
+{white_examples_part}
+</Whitelist>
+
+<Blacklist>
+{black_examples_part}
+</Blacklist>
+</examples>
+
+To complete your task, please follow these steps:
+
+1. Review the given text input carefully. 
+2. Categorize and rate the text content(low/medium/high) based on the provided policy rules.
+3. If the content is appropriate, mark the Result as "pass".
+4. If the content is ambiguous, or you are unsure, mark the Result as "review".
+5. If the content is explicitly high risky, mark the Result as "reject" and specify the violated Category.
+6. Please follow the output format in <examples>, give the explanation at first and then output the result, category and confidence(score range:1-5). 
+
+Below is the content which is pending review. 
+<content>{content}<content>"""
+
+    return system_prompt_v4, instruct_prompt_v5
 
 def extract_tag_content(xml_string):
     tag_contents = {}
