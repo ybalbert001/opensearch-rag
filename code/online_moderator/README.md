@@ -10,7 +10,7 @@
 
 #2
 {
-  "model_id": "anthropic.claude-3-haiku-20240307-v1:0",
+  "model_id": "anthropic.claude-3-sonnet-20240229-v1:0",
   "text": "黃泉非常6",
   "type" : "motto"
 }
